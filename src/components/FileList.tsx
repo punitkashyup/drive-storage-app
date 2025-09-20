@@ -61,26 +61,34 @@ export default function FileList({
   const getThumbnail = (file: DriveFile) => {
     const isImage = file.mimeType.startsWith('image/')
 
-    if (isImage && file.thumbnailLink) {
+    if (isImage) {
       return (
-        <img
-          src={file.thumbnailLink}
-          alt={file.name}
-          className="w-full h-32 object-cover rounded-lg bg-gray-100"
-          onError={(e) => {
-            // Fallback to icon if thumbnail fails to load
-            e.currentTarget.style.display = 'none'
-            e.currentTarget.nextElementSibling?.classList.remove('hidden')
-          }}
-        />
+        <div className="w-full h-32 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden relative">
+          {/* Try to load image through our API endpoint which handles authentication */}
+          <img
+            src={`/api/files/${file.id}/thumbnail`}
+            alt={file.name}
+            className="w-full h-full object-cover rounded-lg"
+            onError={(e) => {
+              // Fallback to file icon if thumbnail fails to load
+              const target = e.currentTarget as HTMLImageElement
+              target.style.display = 'none'
+              const fallback = target.nextElementSibling as HTMLElement
+              if (fallback) {
+                fallback.style.display = 'flex'
+              }
+            }}
+          />
+          <div className="absolute inset-0 hidden items-center justify-center">
+            <Image className="h-12 w-12 text-blue-500" />
+          </div>
+        </div>
       )
     }
 
     return (
       <div className="w-full h-32 bg-gray-100 rounded-lg flex items-center justify-center">
-        {getFileIcon(file.mimeType).type === Image ? (
-          <Image className="h-12 w-12 text-blue-500" />
-        ) : file.mimeType.startsWith('video/') ? (
+        {file.mimeType.startsWith('video/') ? (
           <Video className="h-12 w-12 text-purple-500" />
         ) : file.mimeType.startsWith('audio/') ? (
           <Music className="h-12 w-12 text-green-500" />
@@ -253,12 +261,25 @@ export default function FileList({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3 flex-1 min-w-0">
                     <div className="flex-shrink-0 w-12 h-12">
-                      {file.mimeType.startsWith('image/') && file.thumbnailLink ? (
-                        <img
-                          src={file.thumbnailLink}
-                          alt={file.name}
-                          className="w-12 h-12 object-cover rounded border"
-                        />
+                      {file.mimeType.startsWith('image/') ? (
+                        <div className="w-12 h-12 bg-gray-100 rounded border overflow-hidden relative">
+                          <img
+                            src={`/api/files/${file.id}/thumbnail`}
+                            alt={file.name}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              const target = e.currentTarget as HTMLImageElement
+                              target.style.display = 'none'
+                              const fallback = target.nextElementSibling as HTMLElement
+                              if (fallback) {
+                                fallback.style.display = 'flex'
+                              }
+                            }}
+                          />
+                          <div className="absolute inset-0 hidden items-center justify-center">
+                            {getFileIcon(file.mimeType)}
+                          </div>
+                        </div>
                       ) : (
                         <div className="w-12 h-12 bg-gray-100 rounded flex items-center justify-center">
                           {getFileIcon(file.mimeType)}
