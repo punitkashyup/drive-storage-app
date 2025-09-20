@@ -13,8 +13,10 @@ export interface DriveFile {
 
 export class GoogleDriveService {
   private drive
+  private accessToken: string
 
   constructor(accessToken: string) {
+    this.accessToken = accessToken
     const auth = new google.auth.OAuth2()
     auth.setCredentials({ access_token: accessToken })
     this.drive = google.drive({ version: 'v3', auth })
@@ -52,57 +54,69 @@ export class GoogleDriveService {
     try {
       console.log('Starting file upload:', file.name, 'Size:', file.size, 'Type:', file.type)
 
-      // Convert File to base64 for simple upload
+      // Convert File to ArrayBuffer for resumable upload
       const arrayBuffer = await file.arrayBuffer()
-      const base64 = Buffer.from(arrayBuffer).toString('base64')
 
-      console.log('File converted to base64, length:', base64.length)
+      console.log('File converted to buffer, size:', arrayBuffer.byteLength)
 
-      // Prepare multipart request manually
-      const boundary = '-------314159265358979323846'
-      const delimiter = `\r\n--${boundary}\r\n`
-      const close_delim = `\r\n--${boundary}--`
+      // Use resumable upload instead of multipart for better reliability
+      console.log('Starting resumable upload session...')
 
       const metadata = {
         name: file.name,
         parents: folderId ? [folderId] : undefined
       }
 
-      const multipartRequestBody =
-        delimiter +
-        'Content-Type: application/json\r\n\r\n' +
-        JSON.stringify(metadata) +
-        delimiter +
-        `Content-Type: ${file.type || 'application/octet-stream'}\r\n` +
-        'Content-Transfer-Encoding: base64\r\n\r\n' +
-        base64 +
-        close_delim
-
-      // Make the API call with custom fetch
-      const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,mimeType,size,modifiedTime,thumbnailLink,webViewLink', {
+      // Start resumable upload session
+      const sessionResponse = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${this.drive.context._options.auth.credentials.access_token}`,
-          'Content-Type': `multipart/related; boundary="${boundary}"`
+          'Authorization': `Bearer ${this.accessToken}`,
+          'Content-Type': 'application/json',
         },
-        body: multipartRequestBody
+        body: JSON.stringify(metadata)
+      })
+
+      if (!sessionResponse.ok) {
+        const errorText = await sessionResponse.text()
+        console.error('Session creation failed:', sessionResponse.status, errorText)
+        throw new Error(`Session creation failed: ${sessionResponse.status}`)
+      }
+
+      const uploadUrl = sessionResponse.headers.get('location')
+      if (!uploadUrl) {
+        throw new Error('No upload URL received from Google Drive')
+      }
+
+      console.log('Upload session created, uploading file...')
+
+      // Upload the actual file content (reuse the arrayBuffer we already have)
+      const uploadUrlWithFields = `${uploadUrl}&fields=id,name,mimeType,size,modifiedTime,thumbnailLink,webViewLink`
+      const response = await fetch(uploadUrlWithFields, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': file.type || 'application/octet-stream',
+        },
+        body: arrayBuffer
       })
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
+        const errorText = await response.text()
+        console.error('Upload failed with status:', response.status, 'Error:', errorText)
+        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`)
       }
 
       const result = await response.json()
       console.log('Upload successful:', result.id)
 
       return {
-        id: response.data.id!,
-        name: response.data.name!,
-        mimeType: response.data.mimeType!,
-        size: response.data.size || undefined,
-        modifiedTime: response.data.modifiedTime!,
-        thumbnailLink: response.data.thumbnailLink || undefined,
-        webViewLink: response.data.webViewLink || undefined
+        id: result.id!,
+        name: result.name!,
+        mimeType: result.mimeType!,
+        size: result.size || undefined,
+        modifiedTime: result.modifiedTime!,
+        thumbnailLink: result.thumbnailLink || undefined,
+        webViewLink: result.webViewLink || undefined
       }
     } catch (error: any) {
       console.error('Detailed upload error:', {

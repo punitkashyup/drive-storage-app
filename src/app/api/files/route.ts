@@ -28,8 +28,18 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
 
-    if (!session?.accessToken) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    console.log('Session:', {
+      exists: !!session,
+      hasAccessToken: !!session?.accessToken,
+      tokenLength: session?.accessToken?.length,
+      user: session?.user?.email,
+      error: session?.error
+    })
+
+    if (!session?.accessToken || session.error === "RefreshAccessTokenError") {
+      return NextResponse.json({
+        error: "Authentication failed. Please sign out and sign in again."
+      }, { status: 401 })
     }
 
     const formData = await request.formData()
@@ -39,6 +49,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 })
     }
 
+    console.log('Using access token (first 20 chars):', session.accessToken.substring(0, 20) + '...')
     const driveService = new GoogleDriveService(session.accessToken)
     const uploadedFile = await driveService.uploadFile(file, process.env.GOOGLE_DRIVE_FOLDER_ID)
 
