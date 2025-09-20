@@ -156,6 +156,8 @@ export default function FileList({
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
               placeholder="Search files..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
               disabled
               className="pl-10 bg-gray-50"
             />
