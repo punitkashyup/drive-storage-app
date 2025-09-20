@@ -12,7 +12,7 @@ export default function TermsOfServicePage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <HardDrive className="h-8 w-8 text-blue-600" />
-              <span className="text-xl font-semibold text-gray-900">Drive Storage</span>
+              <span className="text-xl font-semibold text-gray-900">Bucket</span>
             </div>
             <Link href="/">
               <Button variant="outline" size="sm">
@@ -37,14 +37,14 @@ export default function TermsOfServicePage() {
             <section>
               <h2 className="text-xl font-semibold text-gray-900 mb-3">1. Acceptance of Terms</h2>
               <p className="text-gray-700 leading-relaxed">
-                By accessing and using Drive Storage (&quot;the Service&quot;), you accept and agree to be bound by the terms and provision of this agreement. If you do not agree to abide by the above, please do not use this service.
+                By accessing and using Bucket (&quot;the Service&quot;), you accept and agree to be bound by the terms and provision of this agreement. If you do not agree to abide by the above, please do not use this service.
               </p>
             </section>
 
             <section>
               <h2 className="text-xl font-semibold text-gray-900 mb-3">2. Service Description</h2>
               <p className="text-gray-700 leading-relaxed">
-                Drive Storage is a web application that provides file management capabilities integrated with Google Drive. The service allows users to upload, organize, view, and manage their files stored in their personal Google Drive account.
+                Bucket is a web application that provides file management capabilities integrated with Google Drive. The service allows users to upload, organize, view, and manage their files stored in their personal Google Drive account.
               </p>
             </section>
 
@@ -122,7 +122,7 @@ export default function TermsOfServicePage() {
       <footer className="bg-white border-t border-gray-200 mt-12">
         <div className="max-w-4xl mx-auto px-4 py-6">
           <div className="text-center text-gray-600">
-            <p>© 2024 Drive Storage. All rights reserved.</p>
+            <p>© 2024 Bucket. All rights reserved.</p>
             <div className="mt-2 space-x-4">
               <Link href="/privacy-policy" className="text-blue-600 hover:underline">
                 Privacy Policy

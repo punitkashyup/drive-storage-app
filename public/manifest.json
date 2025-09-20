@@ -1,6 +1,6 @@
 {
-  "name": "Drive Storage App",
-  "short_name": "DriveStorage",
+  "name": "Bucket",
+  "short_name": "Bucket",
   "description": "Manage your files with Google Drive integration",
   "start_url": "/dashboard",
   "display": "standalone",

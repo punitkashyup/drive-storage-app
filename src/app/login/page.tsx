@@ -32,7 +32,7 @@ export default function LoginPage() {
               <HardDrive className="h-8 w-8 text-white" />
             </div>
           </div>
-          <CardTitle className="text-2xl font-bold">Drive Storage</CardTitle>
+          <CardTitle className="text-2xl font-bold">Bucket</CardTitle>
           <CardDescription>
             Securely manage your files with Google Drive integration
           </CardDescription>

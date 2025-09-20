@@ -12,7 +12,7 @@ export default function PrivacyPolicyPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <HardDrive className="h-8 w-8 text-blue-600" />
-              <span className="text-xl font-semibold text-gray-900">Drive Storage</span>
+              <span className="text-xl font-semibold text-gray-900">Bucket</span>
             </div>
             <Link href="/">
               <Button variant="outline" size="sm">
@@ -146,7 +146,7 @@ export default function PrivacyPolicyPage() {
                      className="text-blue-600 hover:underline">
                     Google Account Permissions
                   </a>{" "}
-                  and remove "Drive Storage" from the list.
+                  and remove "Bucket" from the list.
                 </p>
               </div>
             </section>
@@ -192,7 +192,7 @@ export default function PrivacyPolicyPage() {
       <footer className="bg-white border-t border-gray-200 mt-12">
         <div className="max-w-4xl mx-auto px-4 py-6">
           <div className="text-center text-gray-600">
-            <p>© 2024 Drive Storage. All rights reserved.</p>
+            <p>© 2024 Bucket. All rights reserved.</p>
             <div className="mt-2 space-x-4">
               <Link href="/privacy-policy" className="text-blue-600 hover:underline">
                 Privacy Policy

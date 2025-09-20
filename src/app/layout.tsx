@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Drive Storage App",
+  title: "Bucket",
   description: "Manage your files with Google Drive integration",
   manifest: "/manifest.json",
   icons: {
@@ -46,7 +46,7 @@ export default function RootLayout({
       <head>
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content="Drive Storage" />
+        <meta name="apple-mobile-web-app-title" content="Bucket" />
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
       <body

@@ -34,7 +34,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             <div className="flex items-center">
               <div className="flex items-center space-x-2">
                 <HardDrive className="h-8 w-8 text-blue-600" />
-                <span className="text-xl font-semibold text-gray-900">Drive Storage</span>
+                <span className="text-xl font-semibold text-gray-900">Bucket</span>
               </div>
             </div>
 
