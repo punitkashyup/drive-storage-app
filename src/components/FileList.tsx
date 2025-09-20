@@ -26,8 +26,7 @@ import {
   FileText,
   Video,
   Music,
-  Archive,
-  Check
+  Archive
 } from "lucide-react"
 
 interface FileListProps {

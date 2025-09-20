@@ -1,5 +1,4 @@
 import { google } from 'googleapis'
-import { Readable } from 'stream'
 
 export interface DriveFile {
   id: string
@@ -118,24 +117,14 @@ export class GoogleDriveService {
         thumbnailLink: result.thumbnailLink || undefined,
         webViewLink: result.webViewLink || undefined
       }
-    } catch (error: any) {
-      console.error('Detailed upload error:', {
-        message: error.message,
-        status: error.status,
-        code: error.code,
-        response: error.response?.data,
-        config: error.config
-      })
+    } catch (error: unknown) {
+      console.error('Detailed upload error:', error)
 
       // Provide more specific error messages
-      if (error.status === 401 || error.code === 401) {
-        throw new Error('Authentication failed. Please sign out and sign in again.')
-      } else if (error.status === 403 || error.code === 403) {
-        throw new Error('Insufficient permissions. Please check your Google Drive permissions.')
-      } else if (error.status === 429 || error.code === 429) {
-        throw new Error('Rate limit exceeded. Please try again later.')
+      if (error instanceof Error) {
+        throw new Error(`Upload failed: ${error.message}`)
       } else {
-        throw new Error(`Upload failed: ${error.message || 'Unknown error'}`)
+        throw new Error('Upload failed: Unknown error')
       }
     }
   }
@@ -232,9 +221,9 @@ export class GoogleDriveService {
       // If we get here, the operation truly failed
       throw new Error(`Rename operation failed with status ${response.status}`)
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error renaming file:', error)
-      throw new Error(`Failed to rename file: ${error.message || 'Unknown error'}`)
+      throw new Error(`Failed to rename file: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   }
 
