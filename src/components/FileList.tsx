@@ -254,13 +254,6 @@ export default function FileList({
               >
                 Select All
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={clearSelection}
-              >
-                Cancel
-              </Button>
               {selectedFiles.size > 0 && (
                 <Button
                   variant="destructive"
