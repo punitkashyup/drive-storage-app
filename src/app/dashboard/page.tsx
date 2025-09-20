@@ -263,6 +263,7 @@ export default function DashboardPage() {
             files={files}
             loading={loading}
             refreshing={refreshing}
+            operationLoading={operationLoading}
             onDownload={downloadFile}
             onRename={renameFile}
             onDelete={deleteFile}

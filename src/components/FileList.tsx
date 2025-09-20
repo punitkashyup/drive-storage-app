@@ -11,6 +11,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import SkeletonLoader from "@/components/SkeletonLoader"
 import {
   Grid,
   List,
@@ -31,6 +32,7 @@ interface FileListProps {
   files: DriveFile[]
   loading?: boolean
   refreshing?: boolean
+  operationLoading?: {[key: string]: 'downloading' | 'renaming' | 'deleting'}
   onDownload: (file: DriveFile) => void
   onRename: (file: DriveFile) => void
   onDelete: (file: DriveFile) => void
@@ -41,6 +43,7 @@ export default function FileList({
   files,
   loading = false,
   refreshing = false,
+  operationLoading = {},
   onDownload,
   onRename,
   onDelete,
@@ -146,8 +149,38 @@ export default function FileList({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      <div className="space-y-4">
+        {/* Search and View Controls */}
+        <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input
+              placeholder="Search files..."
+              disabled
+              className="pl-10 bg-gray-50"
+            />
+          </div>
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled
+              className={viewMode === 'grid' ? 'bg-gray-100' : ''}
+            >
+              <Grid className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled
+              className={viewMode === 'list' ? 'bg-gray-100' : ''}
+            >
+              <List className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+        <SkeletonLoader viewMode={viewMode} count={8} />
       </div>
     )
   }
@@ -203,6 +236,9 @@ export default function FileList({
                 <div className="mb-3 relative w-full h-40 rounded-lg overflow-hidden" style={{ backgroundColor: '#f3f4f6', minHeight: '160px' }}>
                   {file.mimeType.startsWith('image/') ? (
                     <>
+                      {/* Loading skeleton while image loads */}
+                      <div className="absolute inset-0 bg-gray-200 animate-pulse" id={`skeleton-${file.id}`}></div>
+
                       <img
                         src={`/api/files/${file.id}/thumbnail`}
                         alt={file.name}
@@ -213,22 +249,23 @@ export default function FileList({
                           width: '100%',
                           height: '100%',
                           objectFit: 'cover',
-                          display: 'block'
+                          display: 'block',
+                          opacity: '0',
+                          transition: 'opacity 0.3s ease-in-out'
                         }}
                         onLoad={(e) => {
-                          console.log('Image loaded successfully for:', file.name)
-                          // Remove debug border on successful load
                           const target = e.currentTarget as HTMLImageElement
-                          target.style.border = 'none'
+                          const skeleton = document.getElementById(`skeleton-${file.id}`)
+                          target.style.opacity = '1'
+                          if (skeleton) skeleton.style.display = 'none'
                         }}
                         onError={(e) => {
-                          console.log('Image failed to load for:', file.name)
                           const target = e.currentTarget as HTMLImageElement
-                          target.style.display = 'none'
+                          const skeleton = document.getElementById(`skeleton-${file.id}`)
                           const fallback = target.nextElementSibling as HTMLElement
-                          if (fallback) {
-                            fallback.style.display = 'flex'
-                          }
+                          target.style.display = 'none'
+                          if (skeleton) skeleton.style.display = 'none'
+                          if (fallback) fallback.style.display = 'flex'
                         }}
                       />
                       <div
@@ -253,6 +290,18 @@ export default function FileList({
                       )}
                     </div>
                   )}
+                  {/* Loading overlay for individual operations */}
+                  {operationLoading[file.id] && (
+                    <div className="absolute inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center rounded-lg">
+                      <div className="bg-white/90 p-3 rounded-lg shadow-lg flex items-center gap-2 backdrop-blur-md">
+                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-600/20 border-b-blue-600"></div>
+                        <span className="text-xs text-gray-700 font-medium capitalize">
+                          {operationLoading[file.id]}...
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Dropdown positioned absolutely on thumbnail */}
                   <div className="absolute top-2 right-2">
                     <DropdownMenu>
@@ -262,22 +311,24 @@ export default function FileList({
                         size="sm"
                         className="h-8 w-8 p-0 bg-white/80 hover:bg-white/90 backdrop-blur-sm"
                         onClick={(e) => e.stopPropagation()}
+                        disabled={!!operationLoading[file.id]}
                       >
                         <MoreVertical className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => onDownload(file)}>
+                      <DropdownMenuItem onClick={() => onDownload(file)} disabled={!!operationLoading[file.id]}>
                         <Download className="mr-2 h-4 w-4" />
                         Download
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => onRename(file)}>
+                      <DropdownMenuItem onClick={() => onRename(file)} disabled={!!operationLoading[file.id]}>
                         <Edit className="mr-2 h-4 w-4" />
                         Rename
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => onDelete(file)}
                         className="text-red-600"
+                        disabled={!!operationLoading[file.id]}
                       >
                         <Trash className="mr-2 h-4 w-4" />
                         Delete
@@ -304,24 +355,37 @@ export default function FileList({
       ) : (
         <div className="space-y-2 pb-20 md:pb-4">
           {filteredFiles.map((file) => (
-            <Card key={file.id} className="hover:shadow-sm transition-shadow">
+            <Card key={file.id} className={`hover:shadow-sm transition-shadow relative ${operationLoading[file.id] ? 'opacity-60' : ''}`}>
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3 flex-1 min-w-0">
                     <div className="flex-shrink-0 w-12 h-12">
                       {file.mimeType.startsWith('image/') ? (
                         <div className="w-12 h-12 bg-gray-100 rounded border overflow-hidden relative">
+                          {/* Loading skeleton for list view */}
+                          <div className="absolute inset-0 bg-gray-200 animate-pulse" id={`list-skeleton-${file.id}`}></div>
+
                           <img
                             src={`/api/files/${file.id}/thumbnail`}
                             alt={file.name}
                             className="w-full h-full object-cover"
+                            style={{
+                              opacity: '0',
+                              transition: 'opacity 0.3s ease-in-out'
+                            }}
+                            onLoad={(e) => {
+                              const target = e.currentTarget as HTMLImageElement
+                              const skeleton = document.getElementById(`list-skeleton-${file.id}`)
+                              target.style.opacity = '1'
+                              if (skeleton) skeleton.style.display = 'none'
+                            }}
                             onError={(e) => {
                               const target = e.currentTarget as HTMLImageElement
-                              target.style.display = 'none'
+                              const skeleton = document.getElementById(`list-skeleton-${file.id}`)
                               const fallback = target.nextElementSibling as HTMLElement
-                              if (fallback) {
-                                fallback.style.display = 'flex'
-                              }
+                              target.style.display = 'none'
+                              if (skeleton) skeleton.style.display = 'none'
+                              if (fallback) fallback.style.display = 'flex'
                             }}
                           />
                           <div className="absolute inset-0 hidden items-center justify-center">
@@ -341,6 +405,12 @@ export default function FileList({
                       <div className="flex items-center space-x-4 text-xs text-gray-500 mt-1">
                         <span>{formatFileSize(file.size)}</span>
                         <span>{formatDate(file.modifiedTime)}</span>
+                        {operationLoading[file.id] && (
+                          <span className="flex items-center gap-1 text-blue-600">
+                            <div className="animate-spin rounded-full h-3 w-3 border border-blue-600/20 border-b-blue-600"></div>
+                            <span className="capitalize">{operationLoading[file.id]}...</span>
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -351,22 +421,24 @@ export default function FileList({
                         size="sm"
                         className="h-8 w-8 p-0"
                         onClick={(e) => e.stopPropagation()}
+                        disabled={!!operationLoading[file.id]}
                       >
                         <MoreVertical className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => onDownload(file)}>
+                      <DropdownMenuItem onClick={() => onDownload(file)} disabled={!!operationLoading[file.id]}>
                         <Download className="mr-2 h-4 w-4" />
                         Download
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => onRename(file)}>
+                      <DropdownMenuItem onClick={() => onRename(file)} disabled={!!operationLoading[file.id]}>
                         <Edit className="mr-2 h-4 w-4" />
                         Rename
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => onDelete(file)}
                         className="text-red-600"
+                        disabled={!!operationLoading[file.id]}
                       >
                         <Trash className="mr-2 h-4 w-4" />
                         Delete
@@ -382,10 +454,10 @@ export default function FileList({
 
       {/* Refreshing Overlay */}
       {refreshing && (
-        <div className="absolute inset-0 bg-white/50 backdrop-blur-sm flex items-center justify-center z-10 rounded-lg">
-          <div className="bg-white p-4 rounded-lg shadow-lg flex items-center gap-3">
-            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
-            <span className="text-sm text-gray-700">Refreshing files...</span>
+        <div className="absolute inset-0 bg-white/30 backdrop-blur-sm flex items-center justify-center z-10 rounded-lg transition-all duration-300">
+          <div className="bg-white/90 p-4 rounded-lg shadow-lg flex items-center gap-3 border backdrop-blur-md">
+            <div className="animate-spin rounded-full h-5 w-5 border-2 border-blue-600/20 border-b-blue-600"></div>
+            <span className="text-sm text-gray-700 font-medium">Refreshing files...</span>
           </div>
         </div>
       )}
