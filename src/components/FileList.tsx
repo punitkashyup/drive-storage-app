@@ -63,23 +63,23 @@ export default function FileList({
 
     if (isImage) {
       return (
-        <div className="w-full h-32 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden relative">
+        <div className="w-full h-32 bg-gray-100 rounded-lg overflow-hidden relative">
           {/* Try to load image through our API endpoint which handles authentication */}
           <img
             src={`/api/files/${file.id}/thumbnail`}
             alt={file.name}
-            className="w-full h-full object-cover rounded-lg"
+            className="absolute inset-0 w-full h-full object-cover"
             onError={(e) => {
               // Fallback to file icon if thumbnail fails to load
               const target = e.currentTarget as HTMLImageElement
               target.style.display = 'none'
-              const fallback = target.nextElementSibling as HTMLElement
+              const fallback = target.parentElement?.querySelector('.fallback-icon') as HTMLElement
               if (fallback) {
                 fallback.style.display = 'flex'
               }
             }}
           />
-          <div className="absolute inset-0 hidden items-center justify-center">
+          <div className="fallback-icon absolute inset-0 hidden items-center justify-center bg-gray-100 rounded-lg">
             <Image className="h-12 w-12 text-blue-500" />
           </div>
         </div>
@@ -200,11 +200,59 @@ export default function FileList({
             <Card key={file.id} className="hover:shadow-md transition-shadow">
               <CardContent className="p-4">
                 {/* Thumbnail */}
-                <div className="mb-3 relative">
-                  {getThumbnail(file)}
-                  <div className="hidden">
-                    {getFileIcon(file.mimeType)}
-                  </div>
+                <div className="mb-3 relative w-full h-40 rounded-lg overflow-hidden" style={{ backgroundColor: '#f3f4f6', minHeight: '160px' }}>
+                  {file.mimeType.startsWith('image/') ? (
+                    <>
+                      <img
+                        src={`/api/files/${file.id}/thumbnail`}
+                        alt={file.name}
+                        style={{
+                          position: 'absolute',
+                          top: '0',
+                          left: '0',
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                          display: 'block'
+                        }}
+                        onLoad={(e) => {
+                          console.log('Image loaded successfully for:', file.name)
+                          // Remove debug border on successful load
+                          const target = e.currentTarget as HTMLImageElement
+                          target.style.border = 'none'
+                        }}
+                        onError={(e) => {
+                          console.log('Image failed to load for:', file.name)
+                          const target = e.currentTarget as HTMLImageElement
+                          target.style.display = 'none'
+                          const fallback = target.nextElementSibling as HTMLElement
+                          if (fallback) {
+                            fallback.style.display = 'flex'
+                          }
+                        }}
+                      />
+                      <div
+                        className="absolute inset-0 hidden items-center justify-center"
+                        style={{ backgroundColor: '#f3f4f6' }}
+                      >
+                        <Image className="h-12 w-12 text-blue-500" />
+                      </div>
+                    </>
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      {file.mimeType.startsWith('video/') ? (
+                        <Video className="h-12 w-12 text-purple-500" />
+                      ) : file.mimeType.startsWith('audio/') ? (
+                        <Music className="h-12 w-12 text-green-500" />
+                      ) : file.mimeType.includes('text') || file.mimeType.includes('document') ? (
+                        <FileText className="h-12 w-12 text-orange-500" />
+                      ) : file.mimeType.includes('zip') || file.mimeType.includes('archive') ? (
+                        <Archive className="h-12 w-12 text-gray-500" />
+                      ) : (
+                        <File className="h-12 w-12 text-gray-400" />
+                      )}
+                    </div>
+                  )}
                   {/* Dropdown positioned absolutely on thumbnail */}
                   <div className="absolute top-2 right-2">
                     <DropdownMenu>
