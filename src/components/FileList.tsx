@@ -5,6 +5,7 @@ import { DriveFile } from "@/lib/google-drive"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,7 +26,8 @@ import {
   FileText,
   Video,
   Music,
-  Archive
+  Archive,
+  Check
 } from "lucide-react"
 
 interface FileListProps {
@@ -33,9 +35,11 @@ interface FileListProps {
   loading?: boolean
   refreshing?: boolean
   operationLoading?: {[key: string]: 'downloading' | 'renaming' | 'deleting'}
+  selectionMode?: boolean
   onDownload: (file: DriveFile) => void
   onRename: (file: DriveFile) => void
   onDelete: (file: DriveFile) => void
+  onBulkDelete?: (files: DriveFile[]) => void
   onRefresh: () => void
 }
 
@@ -44,13 +48,16 @@ export default function FileList({
   loading = false,
   refreshing = false,
   operationLoading = {},
+  selectionMode = false,
   onDownload,
   onRename,
   onDelete,
+  onBulkDelete,
   onRefresh
 }: FileListProps) {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [searchTerm, setSearchTerm] = useState('')
+  const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set())
 
   const getFileIcon = (mimeType: string) => {
     if (mimeType.startsWith('image/')) return <Image className="h-5 w-5 text-blue-500" />
@@ -128,6 +135,42 @@ export default function FileList({
     file.name.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
+  // Selection helper functions
+  const toggleFileSelection = (fileId: string) => {
+    setSelectedFiles(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(fileId)) {
+        newSet.delete(fileId)
+      } else {
+        newSet.add(fileId)
+      }
+      return newSet
+    })
+  }
+
+  const selectAll = () => {
+    setSelectedFiles(new Set(filteredFiles.map(file => file.id)))
+  }
+
+  const clearSelection = () => {
+    setSelectedFiles(new Set())
+  }
+
+  const handleBulkDelete = () => {
+    if (onBulkDelete && selectedFiles.size > 0) {
+      const selectedFileObjects = files.filter(file => selectedFiles.has(file.id))
+      onBulkDelete(selectedFileObjects)
+      clearSelection()
+    }
+  }
+
+  // Clear selections when selection mode is turned off
+  useEffect(() => {
+    if (!selectionMode) {
+      setSelectedFiles(new Set())
+    }
+  }, [selectionMode])
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -201,6 +244,35 @@ export default function FileList({
           />
         </div>
         <div className="flex items-center space-x-2">
+          {selectionMode && (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={selectAll}
+                disabled={selectedFiles.size === filteredFiles.length}
+              >
+                Select All
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={clearSelection}
+              >
+                Cancel
+              </Button>
+              {selectedFiles.size > 0 && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleBulkDelete}
+                >
+                  <Trash className="h-4 w-4 mr-2" />
+                  Delete ({selectedFiles.size})
+                </Button>
+              )}
+            </>
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -232,8 +304,18 @@ export default function FileList({
       ) : viewMode === 'grid' ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pb-20 md:pb-4">
           {filteredFiles.map((file) => (
-            <Card key={file.id} className="hover:shadow-md transition-shadow">
+            <Card key={file.id} className="hover:shadow-md transition-shadow relative">
               <CardContent className="p-4">
+                {/* Selection checkbox */}
+                {selectionMode && (
+                  <div className="absolute top-2 right-2 z-10">
+                    <Checkbox
+                      checked={selectedFiles.has(file.id)}
+                      onCheckedChange={() => toggleFileSelection(file.id)}
+                      className="bg-white shadow-sm"
+                    />
+                  </div>
+                )}
                 {/* Thumbnail */}
                 <div className="mb-3 relative w-full h-40 rounded-lg overflow-hidden" style={{ backgroundColor: '#f3f4f6', minHeight: '160px' }}>
                   {file.mimeType.startsWith('image/') ? (
@@ -361,6 +443,13 @@ export default function FileList({
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3 flex-1 min-w-0">
+                    {/* Selection checkbox for list view */}
+                    {selectionMode && (
+                      <Checkbox
+                        checked={selectedFiles.has(file.id)}
+                        onCheckedChange={() => toggleFileSelection(file.id)}
+                      />
+                    )}
                     <div className="flex-shrink-0 w-12 h-12">
                       {file.mimeType.startsWith('image/') ? (
                         <div className="w-12 h-12 bg-gray-100 rounded border overflow-hidden relative">

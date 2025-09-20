@@ -7,7 +7,7 @@ import FileUpload from "@/components/FileUpload"
 import FileList from "@/components/FileList"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Upload, RefreshCw } from "lucide-react"
+import { Upload, RefreshCw, Check } from "lucide-react"
 import { toast } from "sonner"
 
 export default function DashboardPage() {
@@ -19,6 +19,7 @@ export default function DashboardPage() {
   const [uploadProgress, setUploadProgress] = useState<{[key: string]: number}>({})
   const [refreshing, setRefreshing] = useState(false)
   const [operationLoading, setOperationLoading] = useState<{[key: string]: 'downloading' | 'renaming' | 'deleting'}>({})
+  const [selectionMode, setSelectionMode] = useState(false)
 
   const fetchFiles = async (showRefreshLoader = false) => {
     try {
@@ -195,6 +196,65 @@ export default function DashboardPage() {
     }
   }
 
+  const bulkDeleteFiles = async (filesToDelete: DriveFile[]) => {
+    if (filesToDelete.length === 0) return
+
+    // Set loading state for all files being deleted
+    const loadingUpdates: {[key: string]: 'deleting'} = {}
+    filesToDelete.forEach(file => {
+      loadingUpdates[file.id] = 'deleting'
+    })
+    setOperationLoading(prev => ({ ...prev, ...loadingUpdates }))
+
+    try {
+      // Delete files in parallel
+      const deletePromises = filesToDelete.map(file =>
+        fetch(`/api/files/${file.id}`, { method: 'DELETE' })
+      )
+
+      const responses = await Promise.all(deletePromises)
+
+      // Check which deletions succeeded
+      const deletedFileIds: string[] = []
+      const failedFiles: DriveFile[] = []
+
+      responses.forEach((response, index) => {
+        if (response.ok) {
+          deletedFileIds.push(filesToDelete[index].id)
+        } else {
+          failedFiles.push(filesToDelete[index])
+        }
+      })
+
+      // Update files list to remove successfully deleted files
+      if (deletedFileIds.length > 0) {
+        setFiles(prev => prev.filter(f => !deletedFileIds.includes(f.id)))
+        toast.success(`${deletedFileIds.length} file(s) deleted successfully`)
+      }
+
+      // Show error for failed deletions
+      if (failedFiles.length > 0) {
+        toast.error(`Failed to delete ${failedFiles.length} file(s). Please try again.`)
+      }
+
+      // Exit selection mode
+      setSelectionMode(false)
+
+    } catch (error) {
+      console.error("Error deleting files:", error)
+      toast.error("Failed to delete files. Please try again.")
+    } finally {
+      // Clear loading states
+      setOperationLoading(prev => {
+        const updated = { ...prev }
+        filesToDelete.forEach(file => {
+          delete updated[file.id]
+        })
+        return updated
+      })
+    }
+  }
+
   useEffect(() => {
     fetchFiles()
   }, [])
@@ -221,6 +281,16 @@ export default function DashboardPage() {
           >
             <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
             Refresh
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setSelectionMode(!selectionMode)}
+            disabled={loading}
+            style={{ height: '40px', width: '128px' }}
+            className="px-4 py-2"
+          >
+            <Check className="h-4 w-4 mr-2" />
+            {selectionMode ? 'Cancel' : 'Select'}
           </Button>
           <Button
             variant="outline"
@@ -264,9 +334,11 @@ export default function DashboardPage() {
             loading={loading}
             refreshing={refreshing}
             operationLoading={operationLoading}
+            selectionMode={selectionMode}
             onDownload={downloadFile}
             onRename={renameFile}
             onDelete={deleteFile}
+            onBulkDelete={bulkDeleteFiles}
             onRefresh={() => fetchFiles(true)}
           />
         </CardContent>
