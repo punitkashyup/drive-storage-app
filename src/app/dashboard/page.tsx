@@ -216,15 +216,15 @@ export default function DashboardPage() {
             variant="outline"
             onClick={() => fetchFiles(true)}
             disabled={refreshing || loading}
-            size="sm"
+            className="h-10 w-32 px-4 py-2"
           >
             <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
           <Button
             onClick={() => setShowUpload(!showUpload)}
-            className="self-start md:self-auto"
             disabled={uploading}
+            className="h-10 w-32 px-4 py-2"
           >
             <Upload className="h-4 w-4 mr-2" />
             {uploading ? "Uploading..." : showUpload ? "Hide Upload" : "Upload Files"}
