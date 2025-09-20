@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { DriveFile } from "@/lib/google-drive"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -30,6 +30,7 @@ import {
 interface FileListProps {
   files: DriveFile[]
   loading?: boolean
+  refreshing?: boolean
   onDownload: (file: DriveFile) => void
   onRename: (file: DriveFile) => void
   onDelete: (file: DriveFile) => void
@@ -39,6 +40,7 @@ interface FileListProps {
 export default function FileList({
   files,
   loading = false,
+  refreshing = false,
   onDownload,
   onRename,
   onDelete,
@@ -54,6 +56,43 @@ export default function FileList({
     if (mimeType.includes('text') || mimeType.includes('document')) return <FileText className="h-5 w-5 text-orange-500" />
     if (mimeType.includes('zip') || mimeType.includes('archive')) return <Archive className="h-5 w-5 text-gray-500" />
     return <File className="h-5 w-5 text-gray-400" />
+  }
+
+  const getThumbnail = (file: DriveFile) => {
+    const isImage = file.mimeType.startsWith('image/')
+
+    if (isImage && file.thumbnailLink) {
+      return (
+        <img
+          src={file.thumbnailLink}
+          alt={file.name}
+          className="w-full h-32 object-cover rounded-lg bg-gray-100"
+          onError={(e) => {
+            // Fallback to icon if thumbnail fails to load
+            e.currentTarget.style.display = 'none'
+            e.currentTarget.nextElementSibling?.classList.remove('hidden')
+          }}
+        />
+      )
+    }
+
+    return (
+      <div className="w-full h-32 bg-gray-100 rounded-lg flex items-center justify-center">
+        {getFileIcon(file.mimeType).type === Image ? (
+          <Image className="h-12 w-12 text-blue-500" />
+        ) : file.mimeType.startsWith('video/') ? (
+          <Video className="h-12 w-12 text-purple-500" />
+        ) : file.mimeType.startsWith('audio/') ? (
+          <Music className="h-12 w-12 text-green-500" />
+        ) : file.mimeType.includes('text') || file.mimeType.includes('document') ? (
+          <FileText className="h-12 w-12 text-orange-500" />
+        ) : file.mimeType.includes('zip') || file.mimeType.includes('archive') ? (
+          <Archive className="h-12 w-12 text-gray-500" />
+        ) : (
+          <File className="h-12 w-12 text-gray-400" />
+        )}
+      </div>
+    )
   }
 
   const formatFileSize = (sizeString?: string) => {
@@ -78,6 +117,25 @@ export default function FileList({
     file.name.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+F or Cmd+F to focus search
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        e.preventDefault()
+        document.querySelector<HTMLInputElement>('input[placeholder*="Search"]')?.focus()
+      }
+      // F5 to refresh
+      if (e.key === 'F5') {
+        e.preventDefault()
+        onRefresh()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [onRefresh])
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -87,7 +145,7 @@ export default function FileList({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 relative">
       {/* Search and View Controls */}
       <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
         <div className="relative flex-1 max-w-md">
@@ -116,9 +174,6 @@ export default function FileList({
           >
             <List className="h-4 w-4" />
           </Button>
-          <Button variant="outline" size="sm" onClick={onRefresh}>
-            Refresh
-          </Button>
         </div>
       </div>
 
@@ -136,13 +191,22 @@ export default function FileList({
           {filteredFiles.map((file) => (
             <Card key={file.id} className="hover:shadow-md transition-shadow">
               <CardContent className="p-4">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1 min-w-0">
+                {/* Thumbnail */}
+                <div className="mb-3 relative">
+                  {getThumbnail(file)}
+                  <div className="hidden">
                     {getFileIcon(file.mimeType)}
                   </div>
-                  <DropdownMenu>
+                  {/* Dropdown positioned absolutely on thumbnail */}
+                  <div className="absolute top-2 right-2">
+                    <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0 bg-white/80 hover:bg-white/90 backdrop-blur-sm"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <MoreVertical className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
@@ -163,7 +227,8 @@ export default function FileList({
                         Delete
                       </DropdownMenuItem>
                     </DropdownMenuContent>
-                  </DropdownMenu>
+                    </DropdownMenu>
+                  </div>
                 </div>
                 <div className="space-y-1">
                   <p className="font-medium text-sm text-gray-900 truncate" title={file.name}>
@@ -187,7 +252,19 @@ export default function FileList({
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3 flex-1 min-w-0">
-                    {getFileIcon(file.mimeType)}
+                    <div className="flex-shrink-0 w-12 h-12">
+                      {file.mimeType.startsWith('image/') && file.thumbnailLink ? (
+                        <img
+                          src={file.thumbnailLink}
+                          alt={file.name}
+                          className="w-12 h-12 object-cover rounded border"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 bg-gray-100 rounded flex items-center justify-center">
+                          {getFileIcon(file.mimeType)}
+                        </div>
+                      )}
+                    </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-sm text-gray-900 truncate">
                         {file.name}
@@ -200,7 +277,12 @@ export default function FileList({
                   </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <MoreVertical className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
@@ -228,6 +310,17 @@ export default function FileList({
           ))}
         </div>
       )}
+
+      {/* Refreshing Overlay */}
+      {refreshing && (
+        <div className="absolute inset-0 bg-white/50 backdrop-blur-sm flex items-center justify-center z-10 rounded-lg">
+          <div className="bg-white p-4 rounded-lg shadow-lg flex items-center gap-3">
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+            <span className="text-sm text-gray-700">Refreshing files...</span>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }

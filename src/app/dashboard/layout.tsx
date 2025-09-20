@@ -40,11 +40,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center space-x-4">
-              <Button variant="outline" size="sm">
-                <Upload className="h-4 w-4 mr-2" />
-                Upload
-              </Button>
-
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative h-8 w-8 rounded-full">
@@ -82,10 +77,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         {isMobileMenuOpen && (
           <div className="md:hidden border-t border-gray-200 bg-white">
             <div className="px-4 py-2 space-y-2">
-              <Button variant="outline" size="sm" className="w-full justify-start">
-                <Upload className="h-4 w-4 mr-2" />
-                Upload
-              </Button>
               <Button variant="ghost" size="sm" className="w-full justify-start" onClick={handleSignOut}>
                 <LogOut className="h-4 w-4 mr-2" />
                 Sign out
@@ -100,23 +91,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         {children}
       </main>
 
-      {/* Mobile bottom navigation */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-2">
-        <div className="flex justify-around">
-          <Button variant="ghost" size="sm" className="flex-col h-auto py-2">
-            <Grid className="h-5 w-5" />
-            <span className="text-xs mt-1">Grid</span>
-          </Button>
-          <Button variant="ghost" size="sm" className="flex-col h-auto py-2">
-            <List className="h-5 w-5" />
-            <span className="text-xs mt-1">List</span>
-          </Button>
-          <Button variant="ghost" size="sm" className="flex-col h-auto py-2">
-            <Upload className="h-5 w-5" />
-            <span className="text-xs mt-1">Upload</span>
-          </Button>
-        </div>
-      </div>
     </div>
   )
 }

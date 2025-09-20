@@ -7,7 +7,8 @@ import FileUpload from "@/components/FileUpload"
 import FileList from "@/components/FileList"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Upload } from "lucide-react"
+import { Upload, RefreshCw } from "lucide-react"
+import { toast } from "sonner"
 
 export default function DashboardPage() {
   const { data: session } = useSession()
@@ -15,42 +16,84 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [showUpload, setShowUpload] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState<{[key: string]: number}>({})
+  const [refreshing, setRefreshing] = useState(false)
+  const [operationLoading, setOperationLoading] = useState<{[key: string]: 'downloading' | 'renaming' | 'deleting'}>({})
 
-  const fetchFiles = async () => {
+  const fetchFiles = async (showRefreshLoader = false) => {
     try {
-      setLoading(true)
+      if (showRefreshLoader) {
+        setRefreshing(true)
+      } else {
+        setLoading(true)
+      }
       const response = await fetch("/api/files")
       if (response.ok) {
         const data = await response.json()
         setFiles(data.files)
+      } else {
+        throw new Error('Failed to fetch files')
       }
     } catch (error) {
       console.error("Error fetching files:", error)
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
   }
 
   const uploadFiles = async (selectedFiles: File[]) => {
     setUploading(true)
+    const newProgress: {[key: string]: number} = {}
+
     try {
-      for (const file of selectedFiles) {
+      for (let i = 0; i < selectedFiles.length; i++) {
+        const file = selectedFiles[i]
+        const fileKey = `${file.name}-${file.size}`
+        newProgress[fileKey] = 0
+        setUploadProgress({...newProgress})
+
         const formData = new FormData()
         formData.append("file", file)
+
+        // Simulate upload progress (since we can't track real progress with fetch easily)
+        const progressInterval = setInterval(() => {
+          newProgress[fileKey] = Math.min(newProgress[fileKey] + 10, 90)
+          setUploadProgress({...newProgress})
+        }, 200)
 
         const response = await fetch("/api/files", {
           method: "POST",
           body: formData
         })
 
+        clearInterval(progressInterval)
+
         if (response.ok) {
           const data = await response.json()
           setFiles(prev => [data.file, ...prev])
+          newProgress[fileKey] = 100
+          setUploadProgress({...newProgress})
+          toast.success(`${file.name} uploaded successfully`)
+        } else {
+          delete newProgress[fileKey]
+          setUploadProgress({...newProgress})
+          throw new Error(`Failed to upload ${file.name}`)
         }
+
+        // Clean up progress after a short delay
+        setTimeout(() => {
+          setUploadProgress(prev => {
+            const updated = {...prev}
+            delete updated[fileKey]
+            return updated
+          })
+        }, 1000)
       }
       setShowUpload(false)
     } catch (error) {
       console.error("Error uploading files:", error)
+      toast.error("Upload failed. Please try again.")
     } finally {
       setUploading(false)
     }
@@ -58,6 +101,7 @@ export default function DashboardPage() {
 
   const downloadFile = async (file: DriveFile) => {
     try {
+      setOperationLoading(prev => ({ ...prev, [file.id]: 'downloading' }))
       const response = await fetch(`/api/files/${file.id}`)
       if (response.ok) {
         const blob = await response.blob()
@@ -69,9 +113,18 @@ export default function DashboardPage() {
         a.click()
         window.URL.revokeObjectURL(url)
         document.body.removeChild(a)
+      } else {
+        throw new Error('Download failed')
       }
     } catch (error) {
       console.error("Error downloading file:", error)
+      toast.error("Failed to download file. Please try again.")
+    } finally {
+      setOperationLoading(prev => {
+        const updated = { ...prev }
+        delete updated[file.id]
+        return updated
+      })
     }
   }
 
@@ -79,6 +132,7 @@ export default function DashboardPage() {
     const newName = prompt("Enter new file name:", file.name)
     if (newName && newName !== file.name) {
       try {
+        setOperationLoading(prev => ({ ...prev, [file.id]: 'renaming' }))
         const response = await fetch(`/api/files/${file.id}`, {
           method: "PATCH",
           headers: {
@@ -92,16 +146,24 @@ export default function DashboardPage() {
           setFiles(prev =>
             prev.map(f => f.id === file.id ? data.file : f)
           )
+          toast.success(`File renamed to "${data.file.name}"`)
         } else {
           // If rename failed, show error and refresh to get current state
           console.error("Rename failed, refreshing file list")
-          alert("Rename operation failed. Refreshing file list...")
-          await fetchFiles()
+          toast.error("Rename operation failed. Refreshing file list...")
+          await fetchFiles(true)
         }
       } catch (error) {
         console.error("Error renaming file:", error)
+        toast.error("Failed to rename file. Please try again.")
         // On error, refresh the file list to show current state
-        await fetchFiles()
+        await fetchFiles(true)
+      } finally {
+        setOperationLoading(prev => {
+          const updated = { ...prev }
+          delete updated[file.id]
+          return updated
+        })
       }
     }
   }
@@ -109,15 +171,26 @@ export default function DashboardPage() {
   const deleteFile = async (file: DriveFile) => {
     if (confirm(`Are you sure you want to delete "${file.name}"?`)) {
       try {
+        setOperationLoading(prev => ({ ...prev, [file.id]: 'deleting' }))
         const response = await fetch(`/api/files/${file.id}`, {
           method: "DELETE"
         })
 
         if (response.ok) {
           setFiles(prev => prev.filter(f => f.id !== file.id))
+          toast.success(`"${file.name}" deleted successfully`)
+        } else {
+          throw new Error('Delete failed')
         }
       } catch (error) {
         console.error("Error deleting file:", error)
+        toast.error("Failed to delete file. Please try again.")
+      } finally {
+        setOperationLoading(prev => {
+          const updated = { ...prev }
+          delete updated[file.id]
+          return updated
+        })
       }
     }
   }
@@ -138,14 +211,25 @@ export default function DashboardPage() {
             Manage your files stored in Google Drive
           </p>
         </div>
-        <Button
-          onClick={() => setShowUpload(!showUpload)}
-          className="self-start md:self-auto"
-          disabled={uploading}
-        >
-          <Upload className="h-4 w-4 mr-2" />
-          {uploading ? "Uploading..." : "Upload Files"}
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => fetchFiles(true)}
+            disabled={refreshing || loading}
+            size="sm"
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+          <Button
+            onClick={() => setShowUpload(!showUpload)}
+            className="self-start md:self-auto"
+            disabled={uploading}
+          >
+            <Upload className="h-4 w-4 mr-2" />
+            {uploading ? "Uploading..." : showUpload ? "Hide Upload" : "Upload Files"}
+          </Button>
+        </div>
       </div>
 
       {/* Upload Section */}
@@ -159,6 +243,8 @@ export default function DashboardPage() {
               onFileSelect={uploadFiles}
               multiple={true}
               maxSize={100}
+              uploading={uploading}
+              uploadProgress={uploadProgress}
             />
           </CardContent>
         </Card>
@@ -173,10 +259,11 @@ export default function DashboardPage() {
           <FileList
             files={files}
             loading={loading}
+            refreshing={refreshing}
             onDownload={downloadFile}
             onRename={renameFile}
             onDelete={deleteFile}
-            onRefresh={fetchFiles}
+            onRefresh={() => fetchFiles(true)}
           />
         </CardContent>
       </Card>

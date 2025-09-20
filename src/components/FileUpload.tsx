@@ -3,7 +3,9 @@
 import { useState, useRef, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Upload, X, File, Image, FileText, Video } from "lucide-react"
+import { Progress } from "@/components/ui/progress"
+import { Upload, X, File, Image, FileText, Video, CheckCircle } from "lucide-react"
+import { toast } from "sonner"
 
 interface FileUploadProps {
   onFileSelect: (files: File[]) => void
@@ -11,6 +13,8 @@ interface FileUploadProps {
   accept?: string
   maxSize?: number // in MB
   className?: string
+  uploading?: boolean
+  uploadProgress?: {[key: string]: number}
 }
 
 export default function FileUpload({
@@ -18,7 +22,9 @@ export default function FileUpload({
   multiple = true,
   accept = "*/*",
   maxSize = 100,
-  className = ""
+  className = "",
+  uploading = false,
+  uploadProgress = {}
 }: FileUploadProps) {
   const [isDragOver, setIsDragOver] = useState(false)
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
@@ -55,7 +61,7 @@ export default function FileUpload({
     })
 
     if (errors.length > 0) {
-      alert(errors.join('\n'))
+      errors.forEach(error => toast.error(error))
     }
 
     if (validFiles.length > 0) {
@@ -78,6 +84,7 @@ export default function FileUpload({
   }
 
   const removeFile = (index: number) => {
+    if (uploading) return // Don't allow removal during upload
     const newFiles = selectedFiles.filter((_, i) => i !== index)
     setSelectedFiles(newFiles)
     onFileSelect(newFiles)
@@ -104,29 +111,37 @@ export default function FileUpload({
         className={`border-2 border-dashed transition-colors ${
           isDragOver
             ? 'border-blue-500 bg-blue-50'
+            : uploading
+            ? 'border-green-300 bg-green-50'
             : 'border-gray-300 hover:border-gray-400'
-        }`}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
+        } ${uploading ? 'pointer-events-none' : ''}`}
+        onDragOver={uploading ? undefined : handleDragOver}
+        onDragLeave={uploading ? undefined : handleDragLeave}
+        onDrop={uploading ? undefined : handleDrop}
       >
         <CardContent className="p-8 text-center">
-          <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+          {uploading ? (
+            <CheckCircle className="mx-auto h-12 w-12 text-green-500 mb-4" />
+          ) : (
+            <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+          )}
           <div className="space-y-2">
             <p className="text-lg font-medium text-gray-900">
-              Drop files here or click to browse
+              {uploading ? 'Uploading files...' : 'Drop files here or click to browse'}
             </p>
             <p className="text-sm text-gray-500">
-              Supports all file types up to {maxSize}MB each
+              {uploading ? 'Please wait while your files are being uploaded' : `Supports all file types up to ${maxSize}MB each`}
             </p>
           </div>
-          <Button
-            variant="outline"
-            className="mt-4"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            Choose Files
-          </Button>
+          {!uploading && (
+            <Button
+              variant="outline"
+              className="mt-4"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              Choose Files
+            </Button>
+          )}
           <input
             ref={fileInputRef}
             type="file"
@@ -142,35 +157,71 @@ export default function FileUpload({
       {selectedFiles.length > 0 && (
         <div className="mt-4 space-y-2">
           <p className="text-sm font-medium text-gray-700">
-            Selected Files ({selectedFiles.length})
+            {uploading ? 'Uploading Files' : 'Selected Files'} ({selectedFiles.length})
           </p>
           <div className="space-y-2 max-h-40 overflow-y-auto">
-            {selectedFiles.map((file, index) => (
-              <div
-                key={index}
-                className="flex items-center justify-between p-2 bg-gray-50 rounded-md"
-              >
-                <div className="flex items-center space-x-2 flex-1 min-w-0">
-                  {getFileIcon(file.type)}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">
-                      {file.name}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {formatFileSize(file.size)}
-                    </p>
-                  </div>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => removeFile(index)}
-                  className="h-8 w-8 p-0"
+            {selectedFiles.map((file, index) => {
+              const fileKey = `${file.name}-${file.size}`
+              const progress = uploadProgress[fileKey] || 0
+              const isComplete = progress === 100
+              const isUploading = progress > 0 && progress < 100
+
+              return (
+                <div
+                  key={index}
+                  className={`p-3 rounded-md border ${
+                    isComplete
+                      ? 'bg-green-50 border-green-200'
+                      : isUploading
+                      ? 'bg-blue-50 border-blue-200'
+                      : 'bg-gray-50 border-gray-200'
+                  }`}
                 >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            ))}
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center space-x-2 flex-1 min-w-0">
+                      {getFileIcon(file.type)}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">
+                          {file.name}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {formatFileSize(file.size)}
+                        </p>
+                      </div>
+                    </div>
+                    {isComplete ? (
+                      <CheckCircle className="h-5 w-5 text-green-500" />
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeFile(index)}
+                        className="h-8 w-8 p-0"
+                        disabled={uploading}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                  {(isUploading || isComplete) && (
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-xs">
+                        <span className={isComplete ? 'text-green-600' : 'text-blue-600'}>
+                          {isComplete ? 'Upload complete' : 'Uploading...'}
+                        </span>
+                        <span className={isComplete ? 'text-green-600' : 'text-blue-600'}>
+                          {progress}%
+                        </span>
+                      </div>
+                      <Progress
+                        value={progress}
+                        className={`h-2 ${isComplete ? 'bg-green-100' : 'bg-blue-100'}`}
+                      />
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
         </div>
       )}
