@@ -151,24 +151,90 @@ export class GoogleDriveService {
 
   async renameFile(fileId: string, newName: string): Promise<DriveFile> {
     try {
-      const response = await this.drive.files.update({
-        fileId,
-        requestBody: { name: newName },
-        fields: 'id,name,mimeType,size,modifiedTime,thumbnailLink,webViewLink'
+      console.log('Renaming file:', fileId, 'to:', newName)
+
+      // Use direct fetch API instead of googleapis for reliability
+      const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?fields=id,name,mimeType,size,modifiedTime,thumbnailLink,webViewLink`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${this.accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: newName
+        })
       })
 
-      return {
-        id: response.data.id!,
-        name: response.data.name!,
-        mimeType: response.data.mimeType!,
-        size: response.data.size || undefined,
-        modifiedTime: response.data.modifiedTime!,
-        thumbnailLink: response.data.thumbnailLink || undefined,
-        webViewLink: response.data.webViewLink || undefined
+      // Google Drive API sometimes returns 500 even when the operation succeeds
+      // Check if we got a valid response body first
+      const responseText = await response.text()
+
+      if (!response.ok && response.status !== 500) {
+        console.error('Rename failed with status:', response.status, 'Error:', responseText)
+        throw new Error(`HTTP error! status: ${response.status}, message: ${responseText}`)
       }
-    } catch (error) {
+
+      // Try to parse the response - if it contains valid data, the operation succeeded
+      let result
+      try {
+        result = JSON.parse(responseText)
+
+        // If we have a valid file object with id and name, consider it successful
+        if (result.id && result.name) {
+          console.log('Rename successful:', result.id)
+          return {
+            id: result.id!,
+            name: result.name!,
+            mimeType: result.mimeType!,
+            size: result.size || undefined,
+            modifiedTime: result.modifiedTime!,
+            thumbnailLink: result.thumbnailLink || undefined,
+            webViewLink: result.webViewLink || undefined
+          }
+        }
+      } catch (parseError) {
+        // If we can't parse the response but status was 500, it might still have worked
+        console.log('Parse error for response, but operation might have succeeded')
+      }
+
+      // If we got here with a 500 error, the operation likely succeeded but Google returned an error
+      // Let's verify by fetching the file to check if the name changed
+      if (response.status === 500) {
+        console.log('Got 500 error but operation might have succeeded, verifying...')
+        try {
+          const verifyResponse = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?fields=id,name,mimeType,size,modifiedTime,thumbnailLink,webViewLink`, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${this.accessToken}`,
+            }
+          })
+
+          if (verifyResponse.ok) {
+            const verifyResult = await verifyResponse.json()
+            if (verifyResult.name === newName) {
+              console.log('Rename was actually successful, returning updated file info')
+              return {
+                id: verifyResult.id!,
+                name: verifyResult.name!,
+                mimeType: verifyResult.mimeType!,
+                size: verifyResult.size || undefined,
+                modifiedTime: verifyResult.modifiedTime!,
+                thumbnailLink: verifyResult.thumbnailLink || undefined,
+                webViewLink: verifyResult.webViewLink || undefined
+              }
+            }
+          }
+        } catch (verifyError) {
+          console.error('Error verifying rename:', verifyError)
+        }
+      }
+
+      // If we get here, the operation truly failed
+      throw new Error(`Rename operation failed with status ${response.status}`)
+
+    } catch (error: any) {
       console.error('Error renaming file:', error)
-      throw new Error('Failed to rename file')
+      throw new Error(`Failed to rename file: ${error.message || 'Unknown error'}`)
     }
   }
 

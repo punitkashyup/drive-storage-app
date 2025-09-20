@@ -92,9 +92,16 @@ export default function DashboardPage() {
           setFiles(prev =>
             prev.map(f => f.id === file.id ? data.file : f)
           )
+        } else {
+          // If rename failed, show error and refresh to get current state
+          console.error("Rename failed, refreshing file list")
+          alert("Rename operation failed. Refreshing file list...")
+          await fetchFiles()
         }
       } catch (error) {
         console.error("Error renaming file:", error)
+        // On error, refresh the file list to show current state
+        await fetchFiles()
       }
     }
   }

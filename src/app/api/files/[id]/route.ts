@@ -55,10 +55,15 @@ export async function PATCH(
     const updatedFile = await driveService.renameFile(resolvedParams.id, name)
 
     return NextResponse.json({ file: updatedFile })
-  } catch (error) {
-    console.error("Error renaming file:", error)
+  } catch (error: any) {
+    console.error("Error renaming file:", {
+      message: error.message,
+      status: error.status,
+      code: error.code,
+      stack: error.stack
+    })
     return NextResponse.json(
-      { error: "Failed to rename file" },
+      { error: `Failed to rename file: ${error.message || 'Unknown error'}` },
       { status: 500 }
     )
   }
